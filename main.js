@@ -25,8 +25,26 @@ const fromTypescript = (includes) => {
             }
         }
     }
-    if (include.typePaths.hasOwnProperty(package) && include.typePaths[package].hasOwnProperty(identifier)) {
+    if (include.typescriptPaths.hasOwnProperty(package) && include.typePaths[package].hasOwnProperty(identifier)) {
         return `${include.typePaths[package][identifier]}/${includes.join('/')}`;
+    } 
+    throw new Error(`no tsconfig found for ${package}`);
+};
+const fromAliasFile = (includes) => {
+    const package = include._getPackage();
+    const identifier = includes.shift();
+    if (!include.aliasPaths.hasOwnProperty(package) && fs.existsSync(`${package}/.idrinth-better-require.json`)) {
+        const paths = resolve(`${package}/.idrinth-better-require.json`);
+        if (paths) {
+            const base = package + '/';
+            include.aliasPaths[package] = {};
+            for (const pattern in paths) {
+                include.aliasPaths[package][pattern.replace(/^[*\\/]+$/, '')] = base + paths[pattern].replace(/^[*\\/]+$/, '');
+            }
+        }
+    }
+    if (include.aliasPaths.hasOwnProperty(package) && include.aliasPaths[package].hasOwnProperty(identifier)) {
+        return `${include.aliasPaths[package][identifier]}/${includes.join('/')}`;
     } 
     throw new Error(`no tsconfig found for ${package}`);
 };
@@ -68,6 +86,7 @@ include._getPackage = () => {
 };
 include.modulePaths = {};
 include.typescriptPaths = {};
+include.aliasPaths = {};
 include.root = __dirname.match(/node_modules/) ? __dirname.replace(/node_module.+$/, '') : __dirname;
 include.writeCache = false;
 include.prefixes = {
@@ -77,7 +96,8 @@ include.prefixes = {
     package: fromPackage,
     pkg: fromPackage,
     ts: fromTypescript,
-    typescript: fromTypescript
+    typescript: fromTypescript,
+    alias: fromAliasFile
 };
 
 Module.prototype.require = include;
@@ -85,7 +105,19 @@ Module.prototype.require = include;
 module.exports = include;
 
 // Cache
-
+const cacheFile = `${include.root}/.idrinth-better-require.json`;
+if (fs.existsSync(cacheFile)) {
+    const cache = resolve(cacheFile);
+    if (cache.modules && typeof cache.modules === 'object') {
+        include.modulePaths = cache.modules;
+    }
+    if (cache.typescript && typeof cache.typescript === 'object') {
+        include.typescriptPaths = cache.typescript;
+    }
+    if (cache.alias && typeof cache.alias === 'object') {
+        include.aliasPaths = cache.alias;
+    }
+}
 
 process.once('exit', () => {
   if (!include.writeCache) {
@@ -93,8 +125,8 @@ process.once('exit', () => {
   }
   try {
     fs.writeFileSync(
-      `${include.root}/.idrinth-better-require.json`,
-      JSON.stringify({modules: include.modulePaths, typescript: include.typescriptPaths}),
+      cacheFile,
+      JSON.stringify({modules: include.modulePaths, typescript: include.typescriptPaths, alias: include.aliasPaths}),
       'utf-8'
     );
   } catch (err) {
