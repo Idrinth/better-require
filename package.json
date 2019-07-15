@@ -1,0 +1,14 @@
+{
+    "name": "@idrinth/better-require",
+    "version": "1.0.0",
+    "keywords": [
+        "require",
+        "alias",
+        "cacheable",
+        "server",
+        "node"
+    ],
+    "author": "Björn Büttner",
+    "contributors": [],
+    "main": "main.js"
+}
